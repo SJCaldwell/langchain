@@ -108,12 +108,28 @@ class SeleniumURLLoader(BaseLoader):
         else:
             raise ValueError("Invalid browser specified. Use 'chrome' or 'firefox'.")
 
-    def load(self) -> List[Document]:
+    def load(
+        self,
+        wait_time: Optional[int] = None,
+        wait_element: Optional[str] = None,
+        wait_text: Optional[str] = None,
+    ) -> List[Document]:
         """Load the specified URLs using Selenium and create Document instances.
+
+        Optional Parameters:
+            wait_time (int): The amount of time (in seconds) to wait before pulling the page source.
+            wait_element (str): A CSS selector of an element to wait for before pulling the page source.
+            wait_text (str): A string of text to wait for in the page source.
+
 
         Returns:
             List[Document]: A list of Document instances with loaded content.
         """
+        import time
+
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.support.ui import WebDriverWait
         from unstructured.partition.html import partition_html
 
         docs: List[Document] = list()
@@ -123,6 +139,19 @@ class SeleniumURLLoader(BaseLoader):
             try:
                 driver.get(url)
                 page_content = driver.page_source
+                if wait_time is not None:
+                    time.sleep(wait_time)
+
+                if wait_element is not None:
+                    WebDriverWait(driver, wait_time or 10).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, wait_element))
+                    )
+
+                if wait_text is not None:
+                    WebDriverWait(driver, wait_time or 10).until(
+                        lambda driver: wait_text in driver.page_source
+                    )
+
                 elements = partition_html(text=page_content)
                 text = "\n\n".join([str(el) for el in elements])
                 metadata = {"source": url}
